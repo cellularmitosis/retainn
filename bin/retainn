@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+
+"""Retainn: a spaced-repetition flashcard system.
+See https://retainn.org."""
+
+# Copyright (c) 2020 Jason Pepas.
+# This code is licensed under the terms of the MIT license.
+# See https://opensource.org/licenses/MIT
+
+import sys
+import os
+import string
+import signal
+
+script_path = os.path.dirname(os.path.realpath(__file__))
+lib_path = "%s/../lib" % script_path
+sys.path.insert(0, lib_path)
+sql_templates_path = "%s/../lib/retainn/sql" % script_path
+import retainn.cli as cli
+import retainn.db as db
+
+
+def sigint_handler(sig, frame):
+    """Handle SIGINT / CTRL+c by quitting."""
+    sys.stderr.write("\nExiting on CTRL+c / SIGINT.\n")
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    signal.signal(signal.SIGINT, sigint_handler)
+
+    if len(sys.argv) == 1:
+        command = ''
+    else:
+        command = sys.argv[1]
+
+    if command in ['help', '--help', '-h']:
+        cli.run_help_command()
+    else:
+        sql_templates = db.load_sql_templates(path=sql_templates_path)
+        db_path = '%s/.retainn/db.sqlite3' % os.environ['HOME']
+        if not os.path.exists(db_path):
+            sys.stdout.write("Creating %s.\n" % db_path)
+            db.create_db(sql_templates_path, db_path)
+        db_conn = db.open_db(db_path)
+        if command in ['', 'review']:
+            cli.run_review_command(db_conn, sql_templates)
+        elif command == 'decks':
+            cli.run_decks_command(db_conn, sql_templates)
+        elif command == 'import':
+            cli.run_import_command(db_conn, sql_templates)
+        elif command == 'update-decks':
+            cli.run_update_decks_command(db_conn, sql_templates)
+        elif command == 'update-deck':
+            cli.run_update_deck_command(db_conn, sql_templates)
+        elif command == 'remove':
+            cli.run_remove_command(db_conn, sql_templates)
+        elif command == 'serve':
+            cli.run_serve_command(db_conn, sql_templates)
+        else:
+            sys.stderr.write("Error: unknown command '%s'\n" % command)
+            exe = os.path.basename(sys.argv[0])
+            sys.stderr.write("Try '%s help'\n" % exe)
+            db_conn.close()
+            sys.exit(1)
+        db_conn.close()
